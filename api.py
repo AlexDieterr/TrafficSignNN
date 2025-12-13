@@ -7,6 +7,7 @@ import base64
 import random
 import pandas as pd
 import os
+from fastapi.middleware.cors import CORSMiddleware
 
 # Load trained model
 model = tf.keras.models.load_model("traffic_sign_cnn.keras")
@@ -60,6 +61,14 @@ CLASS_NAMES = [
 
 # Create FastAPI app
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:4200"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Health check
 @app.get("/health")
