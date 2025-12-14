@@ -1,18 +1,21 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image
 import tensorflow as tf
 import numpy as np
-from PIL import Image
 import io
-import base64
-import random
-import pandas as pd
 import os
-from fastapi.middleware.cors import CORSMiddleware
+import random
+import base64
 
-# Load trained model
+# --------------------------------------------------
+# Load trained model (loaded once at startup)
+# --------------------------------------------------
 model = tf.keras.models.load_model("traffic_sign_cnn.keras")
 
+# --------------------------------------------------
 # Class names (must match training order exactly)
+# --------------------------------------------------
 CLASS_NAMES = [
     "Speed limit (20km/h)",
     "Speed limit (30km/h)",
@@ -59,69 +62,68 @@ CLASS_NAMES = [
     "End of no passing by vehicles over 3.5 metric tons"
 ]
 
-# Create FastAPI app
+# --------------------------------------------------
+# FastAPI app
+# --------------------------------------------------
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # safe here since this is a demo API
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Health check
+# --------------------------------------------------
+# Health check (used by Render + debugging)
+# --------------------------------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-# Prediction endpoint
+# --------------------------------------------------
+# Predict endpoint (used when user drops an image)
+# --------------------------------------------------
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    # Read image
     image_bytes = await file.read()
+
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     img = img.resize((32, 32))
 
-    # Preprocess
     img_array = np.array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
 
-    # Predict
     preds = model.predict(img_array)[0]
-    top_idx = int(np.argmax(preds))
+    class_id = int(np.argmax(preds))
 
     return {
-        "prediction": CLASS_NAMES[top_idx],
-        "confidence": float(preds[top_idx])
+        "prediction": CLASS_NAMES[class_id],
+        "confidence": float(preds[class_id])
     }
 
-
-import kagglehub
-
-DATASET_PATH = kagglehub.dataset_download(
-    "meowmeowmeowmeowmeow/gtsrb-german-traffic-sign"
-)
-
-TEST_CSV = pd.read_csv(os.path.join(DATASET_PATH, "Test.csv"))
+# --------------------------------------------------
+# Random sample images (for Generate button)
+# --------------------------------------------------
+SAMPLE_DIR = "samples"
 
 @app.get("/random-images")
 def random_images(n: int = 5):
-    samples = TEST_CSV.sample(n)
+    files = os.listdir(SAMPLE_DIR)
 
+    if not files:
+        return []
+
+    chosen = random.sample(files, min(n, len(files)))
     results = []
 
-    for _, row in samples.iterrows():
-        img_path = os.path.join(DATASET_PATH, row["Path"])
-
-        with open(img_path, "rb") as f:
-            img_bytes = f.read()
-
-        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+    for fname in chosen:
+        with open(os.path.join(SAMPLE_DIR, fname), "rb") as f:
+            img_base64 = base64.b64encode(f.read()).decode("utf-8")
 
         results.append({
-            "image": img_base64,
-            "label": CLASS_NAMES[row["ClassId"]]
+            "image": img_base64
         })
 
     return results
