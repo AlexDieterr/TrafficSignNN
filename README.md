@@ -4,6 +4,8 @@ This project is a convolutional neural network (CNN) built to classify traffic s
 
 The final result is a trained deep learning model that can classify traffic signs with high accuracy and is exposed through a FastAPI backend, which is then consumed by an Angular frontend via a drag-and-drop demo.
 
+Although this model was trained locally, the pipeline is structured to mirror a production cloud workflow. Data ingestion, preprocessing, training, and inference are clearly separated, allowing each stage to run as an independent batch job in a distributed analytics platform such as Databricks. Preprocessing and training logic is stateless and reproducible, making it suitable for scalable execution on cloud compute.
+
 ---
 
 ## Project Overview
